@@ -49,7 +49,7 @@ jobs:
         run: cargo bump ${{ steps.gitversion.outputs.SemVer }}
 
       - run: cargo build --release
-      - run: cargo package
+      - run: cargo package --allow-dirty
 
       - name: Publish dry-run
         run: cargo publish --dry-run

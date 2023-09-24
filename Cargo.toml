@@ -2,6 +2,9 @@
 name = "dynp"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/chillin-capybara/dynp"
+description = "Dynamic property system that emphasizes the use of the Newtype pattern."
 
 [dependencies]
 thiserror = "1.0.48"

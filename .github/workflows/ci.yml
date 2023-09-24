@@ -30,13 +30,15 @@ jobs:
     needs: build_and_test
     steps:
       - uses: actions/checkout@v3
+      - name: Fetch unshallow
+        run: git fetch --prune --tags --unshallow
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v0.9.7
+        with:
+          versionSpec: '5.x'
       - name: Determine Version
-        id: version
-        run: |
-          dotnet tool install --global dotnet-semver-cli
-          current_version=$(cat Cargo.toml | grep '^version =' | cut -d ' ' -f 3 | sed 's/"//g')
-          new_version=$(dotnet semver -c $current_version)
-          echo ::set-output name=new_version::$new_version
-        shell: bash
+        id: gitversion
+        uses: gittools/actions/gitversion/execute@v0.9.7
+      - run: echo "${{ steps.gitversion.outputs.SemVer }}"
       - run: cargo build --release
       - run: cargo package

@@ -42,6 +42,9 @@ jobs:
         id: gitversion
         uses: gittools/actions/gitversion/execute@v0.9.7
 
+      - name: Install Cargo Bump
+        run: cargo install cargo-bump
+
       - name: Bump Package Version
         run: cargo bump ${{ steps.gitversion.outputs.SemVer }}
 

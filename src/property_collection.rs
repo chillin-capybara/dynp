@@ -14,6 +14,7 @@ pub enum PropertyCollectionError {
     PropertyTypeMismatch,
 }
 
+/// Dynamic collection of properties.
 #[derive(Default, Debug)]
 pub struct PropertyCollection {
     properties: HashMap<TypeId, Box<dyn Any>>,
@@ -115,13 +116,8 @@ impl PropertyCollection {
     ///
     /// # Parameters
     ///
-    /// - `value`: A reference to the value to assign or add to the property collection. The value
-    ///   should be of a type that implements the `Any` trait and can be cloned using `ToOwned`.
-    ///
-    /// # Type Parameters
-    ///
-    /// - `T`: The type of property to assign or add. It should be a type that implements the `Any`
-    ///   trait and can be cloned using `ToOwned`.
+    /// - `value`: The value to assign to the property. It should be a type that implements the `Any`
+    ///  trait and can be cloned using `ToOwned`.
     pub fn assign<U, T: 'static>(&mut self, value: U)
         where
             U: ToOwned<Owned = T>,
@@ -151,35 +147,56 @@ impl PropertyCollection {
     /// Checks if a property of a specified type exists in the collection.
     ///
     /// This function determines whether a property of the specified type `T` exists in the property
-    /// collection. It returns `true` if a property of the given type is found in the collection, and
-    /// `false` otherwise.
+    /// collection. Empty properties (for early subscriptions) are ignored by this function.
     ///
     /// # Returns
     ///
     /// - `true`: If a property of the specified type `T` exists in the collection.
     /// - `false`: If no property of the specified type `T` is found in the collection.
-    ///
-    /// # Type Parameters
-    ///
-    /// - `T`: The type of property to check for. It should be a type that implements the `Any` trait
-    ///   and can be cloned using `ToOwned`.
-    pub fn contains<T: Any + ToOwned<Owned = T>>(&self) -> bool {
-        self.properties.contains_key(&TypeId::of::<T>())
+    pub fn contains<T: Any>(&self) -> bool {
+        match self.get_property::<T>() {
+            Ok(property) => {
+                property.get().is_some()
+            },
+            Err(_) => {
+                false
+            }
+        }
     }
 
     /// Subscribes to changes in a property of a specific type in the PropertyCollection.
     ///
     /// This function attempts to subscribe to changes in a property of the specified type `T` in the
     /// `PropertyCollection`. If the property exists and its type matches `T`, it registers the provided
-    /// callback function to be called when the property's value changes.
+    /// callback function to be called when the property's value changes. If the property does not
+    /// exist in the collection yet, an *early subscription* is performed by adding the callback to
+    /// ab empty property of type `T`. This allows the callback to be called when the property is
+    /// assigned a value later.
+    ///
     ///
     /// # Arguments
-    /// * `callback` - A boxed closure (function) that takes a reference to the property's value (`&T`) as an argument.
+    /// * `callback` - The callback function to be called when the property's value changes.
     ///
-    /// # Returns
-    /// - `Ok(())` if the property of type `T` exists and its type matches `T`, and the subscription is set successfully.
-    /// - `Err(PropertyCollectionError::PropertyNotFound)` if the property is not found.
-    /// - `Err(PropertyCollectionError::PropertyTypeMismatch)` if the property's type does not match `T`.
+    /// # Example
+    ///
+    /// ```
+    /// use dynp::PropertyCollection;
+    ///
+    /// // define a custom property using the Newtype pattern
+    /// #[derive(Copy, Clone, Debug)]
+    /// struct CustomProperty(i32);
+    ///
+    /// fn main() {
+    ///     // create a new property collection
+    ///     let mut collection = PropertyCollection::new();
+    ///     collection.subscribe::<CustomProperty>(|value: &CustomProperty| {
+    ///         println!("Property changed: {:?}", value);
+    ///     });
+    ///
+    ///     // assign a new property
+    ///     collection.assign(CustomProperty(42));
+    /// }
+    /// ```
     pub fn subscribe<T: Any>(
         &mut self,
         callback: impl FnMut(&T) + 'static

@@ -1,5 +1,7 @@
 # dynp
 
+[![codecov](https://codecov.io/gh/chillin-capybara/dynp/graph/badge.svg?token=P49P373ZGE)](https://codecov.io/gh/chillin-capybara/dynp)
+
 A dynamic, type-safe property system that emphasizes the use of the Newtype pattern.
 
 ## 💡 Inspiration

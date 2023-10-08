@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use crate::property::Property;
 
 /// Dynamic collection of properties.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct PropertyCollection {
     properties: HashMap<TypeId, Box<dyn Any>>,
 }
@@ -228,7 +228,7 @@ mod tests {
     }
 
     #[test]
-    fn test_subscribe() {
+    fn test_early_subscribe() {
         let mut collection = PropertyCollection::new();
 
         let count = std::sync::Arc::new(std::sync::Mutex::new(0));
@@ -246,6 +246,35 @@ mod tests {
         assert_eq!(*count.lock().unwrap(), 1);
 
         // perform a new assignment
+        collection.assign::<i32>(11);
+        assert_eq!(*count.lock().unwrap(), 2);
+    }
+
+    #[test]
+    fn test_subscribe() {
+        let mut collection = PropertyCollection::new();
+
+        let count = std::sync::Arc::new(std::sync::Mutex::new(0));
+        let count_clone = std::sync::Arc::clone(&count);
+
+        // perform an assignment
+        collection.assign::<i32>(11);
+        assert_eq!(*count.lock().unwrap(), 0);
+
+        // create an early subscription
+        collection.subscribe::<i32>(move |value: &i32| {
+            assert_eq!(*value, 11);
+            let mut count = count_clone.lock().unwrap();
+            *count += 1;
+        });
+
+        assert_eq!(*count.lock().unwrap(), 0);
+
+        // perform an assignment
+        collection.assign::<i32>(11);
+        assert_eq!(*count.lock().unwrap(), 1);
+
+        // perform an assignment
         collection.assign::<i32>(11);
         assert_eq!(*count.lock().unwrap(), 2);
     }

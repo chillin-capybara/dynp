@@ -36,4 +36,4 @@
 mod property_collection;
 mod property;
 
-pub use property_collection::{PropertyCollection, PropertyCollectionError};
+pub use property_collection::PropertyCollection;

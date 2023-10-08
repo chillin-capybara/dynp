@@ -23,12 +23,10 @@ pub struct Property<T: Any>
 impl<T: Any> Property<T>
 {
     /// Creates a new property with the given value.
-    pub fn new<U>(value: U) -> Self
-        where
-            U: ToOwned<Owned = T>,
+    pub fn new(value: T) -> Self
     {
         Self {
-            value: Some(value.to_owned()),
+            value: Some(value),
             subscriptions: Vec::new(),
         }
     }
@@ -41,15 +39,13 @@ impl<T: Any> Property<T>
     }
 
     /// Returns a reference to the value of the property.
-    pub fn get(&self) -> &Option<T> {
-        &self.value
+    pub fn get(&self) -> Option<&T> {
+        self.value.as_ref()
     }
 
-    pub fn assign<U>(&mut self, value: U)
-    where
-        U: ToOwned<Owned = T>,
+    pub fn assign(&mut self, value: T)
     {
-        self.value = Some(value.to_owned());
+        self.value = Some(value);
 
         for callback in self.subscriptions.iter_mut() {
             // the value can be unwrapped safely because we just assigned it above
@@ -80,25 +76,25 @@ mod tests {
     #[test]
     fn test_empty_property_i32() {
         let prop = Property::<i32>::empty();
-        assert_eq!(*prop.get(), None);
+        assert_eq!(prop.get(), None);
     }
 
     #[test]
     fn test_new_property_i32() {
         let prop = Property::new(42);
-        assert_eq!(*prop.get(), Some(42));
+        assert_eq!(prop.get(), Some(42).as_ref());
     }
 
     #[test]
     fn test_assign_property_i32() {
         let mut prop = Property::new(42);
-        assert_eq!(*prop.get(), Some(42));
+        assert_eq!(prop.get(), Some(42).as_ref());
 
         prop.assign(99);
-        assert_eq!(*prop.get(), Some(99));
+        assert_eq!(prop.get(), Some(99).as_ref());
 
         prop.assign(11);
-        assert_eq!(*prop.get(), Some(11));
+        assert_eq!(prop.get(), Some(11).as_ref());
     }
 
     #[test]
@@ -127,25 +123,25 @@ mod tests {
     #[test]
     fn test_empty_property_newtype() {
         let prop = Property::<MyInt>::empty();
-        assert_eq!(*prop.get(), None);
+        assert_eq!(prop.get(), None);
     }
 
     #[test]
     fn test_new_property_newtype() {
         let prop = Property::new(MyInt(42));
-        assert_eq!(*prop.get(), Some(MyInt(42)));
+        assert_eq!(prop.get(), Some(MyInt(42)).as_ref());
     }
 
     #[test]
     fn test_assign_property_newtype() {
         let mut prop = Property::new(MyInt(42));
-        assert_eq!(*prop.get(), Some(MyInt(42)));
+        assert_eq!(prop.get(), Some(MyInt(42)).as_ref());
 
         prop.assign(MyInt(99));
-        assert_eq!(*prop.get(), Some(MyInt(99)));
+        assert_eq!(prop.get(), Some(MyInt(99)).as_ref());
 
         prop.assign(MyInt(11));
-        assert_eq!(*prop.get(), Some(MyInt(11)));
+        assert_eq!(prop.get(), Some(MyInt(11)).as_ref());
     }
 
     #[test]

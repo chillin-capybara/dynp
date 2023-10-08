@@ -1,21 +1,10 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use thiserror::Error;
 use crate::property::Property;
 
-// TODO: complete the documentation
-
-#[derive(Error, Debug)]
-pub enum PropertyCollectionError {
-    #[error("Property not found in the collection.")]
-    PropertyNotFound,
-    #[error("Property type mismatch.")]
-    PropertyTypeMismatch,
-}
-
 /// Dynamic collection of properties.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct PropertyCollection {
     properties: HashMap<TypeId, Box<dyn Any>>,
 }
@@ -29,18 +18,12 @@ impl PropertyCollection {
 
     /// Retrieves a reference to a property of a specific type from the PropertyCollection.
     ///
-    /// This function attempts to retrieve a property of the specified type `T` from the
-    /// `PropertyCollection`. If the property exists and its type matches `T`, a reference to
-    /// that property is returned. If the property does not exist or its type does not match `T`,
-    /// an error is returned.
-    ///
     /// # Returns
-    ///
-    /// - `Ok(&Property<T>)` if the property of type `T` exists and its type matches `T`.
-    /// - `Err(PropertyCollectionError::PropertyNotFound)` if the property is not found.
-    /// - `Err(PropertyCollectionError::PropertyTypeMismatch)` if the property's type does not match `T`.
+    /// - `Some(&Property<T>)` if the property of type `T` exists and its type matches `T`.
+    /// - `None` if the property is not found or the property assigned to the TypeId of `T` does not
+    ///  match `T`.
     #[inline]
-    fn get_property<T: Any>(&self) -> Result<&Property<T>, PropertyCollectionError> {
+    fn get_property<T: Any>(&self) -> Option<&Property<T>> {
         // Get the TypeId of the specified type T
         let type_id = TypeId::of::<T>();
 
@@ -49,62 +32,42 @@ impl PropertyCollection {
             // Attempt to downcast the property to the specified type T
             property
                 .downcast_ref::<Property<T>>()
-                .ok_or(PropertyCollectionError::PropertyTypeMismatch)
         } else {
             // Property not found
-            Err(PropertyCollectionError::PropertyNotFound)
+            None
         }
     }
 
     /// Retrieves a mutable reference to a property of a specific type from the PropertyCollection.
     ///
-    /// This function attempts to retrieve a property of the specified type `T` from the
-    /// `PropertyCollection`. If the property exists and its type matches `T`, a reference to
-    /// that property is returned. If the property does not exist or its type does not match `T`,
-    /// an error is returned.
-    ///
     /// # Returns
-    ///
-    /// - `Ok(&mut Property<T>)` if the property of type `T` exists and its type matches `T`.
-    /// - `Err(PropertyCollectionError::PropertyNotFound)` if the property is not found.
-    /// - `Err(PropertyCollectionError::PropertyTypeMismatch)` if the property's type does not match `T`.
+    /// - `Some(&mut Property<T>)` if the property of type `T` exists and its type matches `T`.
+    /// - `None` if the property is not found or the property assigned to the TypeId of `T` does not
+    ///  match `T`.
     #[inline]
-    fn get_property_mut<T: Any>(&mut self) -> Result<&mut Property<T>,
-        PropertyCollectionError> {
+    fn get_property_mut<T: Any>(&mut self) -> Option<&mut Property<T>> {
         let type_id = TypeId::of::<T>();
         if let Some(property) = self.properties.get_mut(&type_id) {
             property
                 .downcast_mut::<Property<T>>()
-                .ok_or(PropertyCollectionError::PropertyTypeMismatch)
         } else {
-            Err(PropertyCollectionError::PropertyNotFound)
+            None
         }
     }
 
     /// Retrieves the value of a property of a specific type from the PropertyCollection.
     ///
-    /// This function attempts to retrieve the value of a property of the specified type `T` from the
-    /// `PropertyCollection`. If the property exists and its type matches `T`, a reference to its value
-    /// is returned.
-    ///
-    /// # Arguments
-    ///
-    /// * `self` - A reference to the `PropertyCollection` from which to retrieve the property value.
-    ///
+    /// # Type Parameters
+    /// - `T`: The type of the property to retrieve. It should be a type that implements the `Any`
+    /// 
     /// # Returns
-    ///
-    /// - `Ok(&T)` if the property of type `T` exists and its type matches `T`.
-    /// - `Err(PropertyCollectionError::PropertyNotFound)` if the property is not found.
-    /// - `Err(PropertyCollectionError::PropertyTypeMismatch)` if the property's type does not match `T`.
-    pub fn get<T: Any>(&self) -> Result<&T, PropertyCollectionError> {
-        // Attempt to get the property of type T
-        let property: &Property<T> = self.get_property::<T>()?;
-        if let Some(value) = property.get() {
-            // Return a reference to the property's value
-            Ok(value)
+    /// - `Some(&T)` if the property of type `T` exists.
+    /// - `None` if the property is not found.
+    pub fn get<T: Any>(&self) -> Option<&T> {
+        if let Some(property) = self.get_property::<T>() {
+            property.get()
         } else {
-            // Property has no value (it's empty)
-            Err(PropertyCollectionError::PropertyNotFound)
+            None
         }
     }
 
@@ -114,54 +77,32 @@ impl PropertyCollection {
     /// if it already exists in the collection. If no property of that type exists, a new property of
     /// that type is added to the collection with the specified `value`.
     ///
+    /// # Type Parameters
+    /// - `T`: The type of the property to assign. It should be a type that implements the `Any`
+    /// 
     /// # Parameters
-    ///
-    /// - `value`: The value to assign to the property. It should be a type that implements the `Any`
-    ///  trait and can be cloned using `ToOwned`.
-    pub fn assign<U, T: 'static>(&mut self, value: U)
-        where
-            U: ToOwned<Owned = T>,
+    /// - `value`: The value of type `T` to assign to the property.
+    pub fn assign<T: Any>(&mut self, value: T)
     {
-        let property = self.get_property_mut::<T>();
-        match property {
-            Ok(property) => {
-                // if the property exists, set its value
-                property.assign(value);
-            }
-            Err(err) => {
-                match err {
-                    // if the property doesn't exist, add it
-                    PropertyCollectionError::PropertyNotFound => {
-                        self.properties.insert(
-                            TypeId::of::<T>(),
-                            Box::new(Property::new(value))
-                        );
-                    }
-                    // if the property type doesn't match, return the error
-                    _ => panic!("Unexpected error, when assigning a property!")
-                }
-            }
+        if let Some(property) = self.get_property_mut::<T>() {
+            // if the property was found, just assign the new value
+            property.assign(value);
+        } else {
+            // if the property was not found, add it to the collection
+            self.properties.insert(
+                TypeId::of::<T>(),
+                Box::new(Property::new(value))
+            );
         }
     }
 
     /// Checks if a property of a specified type exists in the collection.
     ///
-    /// This function determines whether a property of the specified type `T` exists in the property
-    /// collection. Empty properties (for early subscriptions) are ignored by this function.
-    ///
     /// # Returns
-    ///
-    /// - `true`: If a property of the specified type `T` exists in the collection.
-    /// - `false`: If no property of the specified type `T` is found in the collection.
+    /// * `true` - If a property of the specified type `T` exists in the collection.
+    /// * `false` - If no property of the specified type `T` is found in the collection.
     pub fn contains<T: Any>(&self) -> bool {
-        match self.get_property::<T>() {
-            Ok(property) => {
-                property.get().is_some()
-            },
-            Err(_) => {
-                false
-            }
-        }
+        self.get_property::<T>().is_some()
     }
 
     /// Subscribes to changes in a property of a specific type in the PropertyCollection.
@@ -201,26 +142,18 @@ impl PropertyCollection {
         &mut self,
         callback: impl FnMut(&T) + 'static
     ) {
-        match self.get_property_mut::<T>() {
-            Ok(property) => {
-                // if the property exists, add the callback to its subscriptions
-                property.subscribe(Box::new(callback));
-            },
-            Err(err) => {
-                match err {
-                    PropertyCollectionError::PropertyNotFound => {
-                        // perform an early subscription by adding the callback to an empty
-                        // property's subscriptions
-                        let mut property: Property<T> = Property::empty();
-                        property.subscribe(Box::new(callback));
-                        self.properties.insert(
-                            TypeId::of::<T>(),
-                            Box::new(property)
-                        );
-                    },
-                    _ => panic!("Unexpected error at property subscription: {:?}", err)
-                }
-            }
+        if let Some(property) = self.get_property_mut::<T>() {
+            // if the property exists, add the callback to its subscriptions
+            property.subscribe(Box::new(callback));
+        } else {
+            // if the property does not exist, add an empty property and add the callback to its
+            // subscriptions
+            let mut property: Property<T> = Property::empty();
+            property.subscribe(Box::new(callback));
+            self.properties.insert(
+                TypeId::of::<T>(),
+                Box::new(property)
+            );
         }
     }
 }
@@ -244,66 +177,32 @@ mod tests {
         let mut collection = PropertyCollection::new();
         collection.assign(42);
 
-        // existing property
-        match collection.get::<i32>() {
-            Ok(val) => assert_eq!(val, &42),
-            Err(_) => panic!("Expected property of type i32"),
-        }
+        assert_eq!(collection.get::<i32>(), Some(&42));
+        assert_eq!(collection.get::<u32>(), None);
+        assert_eq!(collection.get::<String>(), None);
 
-        // non-existing property
-        match collection.get::<String>() {
-            Err(PropertyCollectionError::PropertyNotFound) => (),
-            _ => panic!("Expected PropertyNotFound error"),
-        }
-
-        // non-existing property
-        match collection.get::<u32>() {
-            Err(PropertyCollectionError::PropertyNotFound) => (),
-            _ => panic!("Expected PropertyNotFound error"),
-        }
 
         collection.assign(11);
+        assert_eq!(collection.get::<i32>(), Some(&11));
+        assert_eq!(collection.get::<u32>(), None);
+        assert_eq!(collection.get::<String>(), None);
 
-        // existing property
-        match collection.get::<i32>() {
-            Ok(val) => assert_eq!(val, &11),
-            Err(_) => panic!("Expected property of type i32"),
-        }
-
-        // non-existing property
-        match collection.get::<String>() {
-            Err(PropertyCollectionError::PropertyNotFound) => (),
-            _ => panic!("Expected PropertyNotFound error"),
-        }
-
-        // non-existing property
-        match collection.get::<u32>() {
-            Err(PropertyCollectionError::PropertyNotFound) => (),
-            _ => panic!("Expected PropertyNotFound error"),
-        }
+        // make sure the reference does not interfere with the original property
+        collection.assign(&99);
+        assert_eq!(collection.get::<i32>(), Some(&11));
+        assert_eq!(collection.get::<&i32>(), Some(&&99));
+        assert_eq!(collection.get::<u32>(), None);
+        assert_eq!(collection.get::<String>(), None);
     }
 
     #[test]
     fn test_assign_get_property_newtype() {
         let mut collection = PropertyCollection::new();
+        
         collection.assign(MyInt(42));
-
-        // existing property
-        match collection.get::<MyInt>() {
-            Ok(val) => assert_eq!(val.0, 42),
-            Err(_) => panic!("Expected property of type MyInt"),
-        }
-
-        // non-existing property
-        match collection.get::<i32>() {
-            Err(PropertyCollectionError::PropertyNotFound) => (),
-            _ => panic!("Expected PropertyNotFound error"),
-        }
-
-        match collection.get::<String>() {
-            Err(PropertyCollectionError::PropertyNotFound) => (),
-            _ => panic!("Expected PropertyNotFound error"),
-        }
+        assert_eq!(collection.get::<MyInt>(), Some(&MyInt(42)));
+        assert_eq!(collection.get::<i32>(), None);
+        assert_eq!(collection.get::<u32>(), None);
     }
 
     #[test]
@@ -326,6 +225,58 @@ mod tests {
         assert!(collection.contains::<MyInt>());
         assert!(!collection.contains::<i32>());
         assert!(!collection.contains::<String>());
+    }
+
+    #[test]
+    fn test_early_subscribe() {
+        let mut collection = PropertyCollection::new();
+
+        let count = std::sync::Arc::new(std::sync::Mutex::new(0));
+        let count_clone = std::sync::Arc::clone(&count);
+
+        // create an early subscription
+        collection.subscribe::<i32>(move |value: &i32| {
+            assert_eq!(*value, 11);
+            let mut count = count_clone.lock().unwrap();
+            *count += 1;
+        });
+
+        // perform an assignment
+        collection.assign::<i32>(11);
+        assert_eq!(*count.lock().unwrap(), 1);
+
+        // perform a new assignment
+        collection.assign::<i32>(11);
+        assert_eq!(*count.lock().unwrap(), 2);
+    }
+
+    #[test]
+    fn test_subscribe() {
+        let mut collection = PropertyCollection::new();
+
+        let count = std::sync::Arc::new(std::sync::Mutex::new(0));
+        let count_clone = std::sync::Arc::clone(&count);
+
+        // perform an assignment
+        collection.assign::<i32>(11);
+        assert_eq!(*count.lock().unwrap(), 0);
+
+        // create an early subscription
+        collection.subscribe::<i32>(move |value: &i32| {
+            assert_eq!(*value, 11);
+            let mut count = count_clone.lock().unwrap();
+            *count += 1;
+        });
+
+        assert_eq!(*count.lock().unwrap(), 0);
+
+        // perform an assignment
+        collection.assign::<i32>(11);
+        assert_eq!(*count.lock().unwrap(), 1);
+
+        // perform an assignment
+        collection.assign::<i32>(11);
+        assert_eq!(*count.lock().unwrap(), 2);
     }
 
 }

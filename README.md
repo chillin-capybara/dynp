@@ -35,11 +35,11 @@ fn main() {
 
     // get the property
     match collection.get::<CustomProperty>() {
-       Ok(prop) => {
+       Some(prop) => {
           println!("Property: {:?}", prop);
         },
-        Err(err) => {
-            println!("Error: {:?}", err);
+        None => {
+            println!("Property does not exist");
         }
     };
 }
